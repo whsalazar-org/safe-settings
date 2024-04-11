@@ -89,31 +89,6 @@ module.exports = (robot, { getRouter }, Settings = require('./lib/settings')) =>
     }
   }
 
-  async function renameSync (nop, context, repo = context.repo(), rename, ref) {
-    try {
-      deploymentConfig = await loadYamlFileSystem()
-      robot.log.debug(`deploymentConfig is ${JSON.stringify(deploymentConfig)}`)
-      const configManager = new ConfigManager(context, ref)
-      const runtimeConfig = await configManager.loadGlobalSettingsYaml()
-      const config = Object.assign({}, deploymentConfig, runtimeConfig)
-      const renameConfig = Object.assign({}, config, rename)
-      robot.log.debug(`config for ref ${ref} is ${JSON.stringify(config)}`)
-      return Settings.sync(nop, context, repo, renameConfig, ref )
-    } catch (e) {
-      if (nop) {
-        let filename = env.SETTINGS_FILE_PATH
-        if (!deploymentConfig) {
-          filename = env.DEPLOYMENT_CONFIG_FILE
-          deploymentConfig = {}
-        }
-        const nopcommand = new NopCommand(filename, repo, null, e, 'ERROR')
-        robot.log.error(`NOPCOMMAND ${JSON.stringify(nopcommand)}`)
-        Settings.handleError(nop, context, repo, deploymentConfig, ref, nopcommand)
-      } else {
-        throw e
-      }
-    }
-  }
   /**
    * Loads the deployment config file from file system
    * Do this once when the app starts and then return the cached value
@@ -262,32 +237,6 @@ module.exports = (robot, { getRouter }, Settings = require('./lib/settings')) =>
       return syncAllSettings(false, context)
     }
 
-
-    const subOrgChanges = getAllChangedSubOrgConfigs(payload)
-    if (subOrgChanges.length) {
-      return Promise.all(subOrgChanges.map(suborg => {
-        return syncSubOrgSettings(false, context, suborg)
-      }))
-    }
-
-    const params = Object.assign(context.repo(), { basehead: `${payload.before}...${payload.after}` })
-    const changes = await context.octokit.repos.compareCommitsWithBasehead(params)
-
-    const renamedFiles = changes.data.files.filter(f => f.status ==='renamed')
-
-    if (renamedFiles.length > 0) {
-      robot.log.debug(`Renamed files detected: ${JSON.stringify(renamedFiles)}`)
-      const settingPattern = new Glob(`${env.CONFIG_PATH}/repos/*.yml`)
-      return Promise.all(renamedFiles.map(f => { 
-        const from = f.previous_filename.match(settingPattern)[1]
-        const to = f.filename.match(settingPattern)[1]
-        // Create a repository config to reset the name back to the previous name
-        const rename = {repository: { name: to, oldname: from}}
-        const repo = {repo: from, owner: payload.repository.owner.login}
-        return renameSync(false, context, repo, rename)
-      }))
-    }
-
     const repoChanges = getAllChangedRepoConfigs(payload, context.repo().owner)
     if (repoChanges.length > 0) {
       return Promise.all(repoChanges.map(repo => {
@@ -295,6 +244,12 @@ module.exports = (robot, { getRouter }, Settings = require('./lib/settings')) =>
       }))
     }
 
+    const changes = getAllChangedSubOrgConfigs(payload)
+    if (changes.length) {
+      return Promise.all(changes.map(suborg => {
+        return syncSubOrgSettings(false, context, suborg)
+      }))
+    }
 
     robot.log.debug(`No changes in '${Settings.FILE_NAME}' detected, returning...`)
   })
@@ -382,24 +337,6 @@ module.exports = (robot, { getRouter }, Settings = require('./lib/settings')) =>
     return syncSettings(false, context)
   })
 
-  robot.on('repository.renamed', async context => {
-    const { payload } = context
-    const { sender } = payload
-
-    robot.log.debug('repository renamed from ', payload.changes.repository.name.from)
-
-    if (sender.type === 'Bot') {
-      robot.log.debug('Repository Edited by a Bot')
-      return
-    }
-    robot.log.debug('Repository Edited by a Human')
-    // Create a repository config to reset the name back to the previous name
-    const rename = {repository: { name: payload.changes.repository.name.from, oldname: payload.repository.name}}
-    const repo = {repo: payload.changes.repository.name.from, owner: payload.repository.owner.login}
-    return renameSync(false, context, repo, rename)
-  })
-
-
   robot.on('check_suite.requested', async context => {
     const { payload } = context
     const { repository } = payload
@@ -446,26 +383,7 @@ module.exports = (robot, { getRouter }, Settings = require('./lib/settings')) =>
     const pull_request = payload.pull_request
     return createCheckRun(context, pull_request, payload.pull_request.head.sha, payload.pull_request.head.ref)
   })
-/*
-  robot.on('pull_request.synchronize', async context => {
-    robot.log.debug('Pull_request opened !')
-    const { payload } = context
-    const { repository } = payload
-    const adminRepo = repository.name === env.ADMIN_REPO
-    robot.log.debug(`Is Admin repo event ${adminRepo}`)
-    if (!adminRepo) {
-      robot.log.debug('Not working on the Admin repo, returning...')
-      return
-    }
-    const defaultBranch = payload.pull_request.head_branch === repository.default_branch
-    if (defaultBranch) {
-      robot.log.debug(' Working on the default branch, returning...')
-      return
-    }
-    const pull_request = payload.pull_request
-    return createCheckRun(context, pull_request, payload.pull_request.head.sha, payload.pull_request.head.ref)
-  })
-*/
+
   robot.on('pull_request.reopened', async context => {
     robot.log.debug('Pull_request REopened !')
     const { payload } = context
@@ -546,24 +464,7 @@ module.exports = (robot, { getRouter }, Settings = require('./lib/settings')) =>
     }
     params = Object.assign(context.repo(), { basehead: `${check_suite.before}...${check_suite.after}` })
     const changes = await context.octokit.repos.compareCommitsWithBasehead(params)
-
-    const renamedFiles = changes.data.files.filter(f => f.status ==='renamed')
-
-    if (renamedFiles.length > 0) {
-      robot.log.debug(`Renamed files detected: ${JSON.stringify(renamedFiles)}`)
-      const settingPattern = new Glob(`${env.CONFIG_PATH}/repos/*.yml`)
-      return Promise.all(renamedFiles.map(f => { 
-        const from = f.previous_filename.match(settingPattern)[1]
-        const to = f.filename.match(settingPattern)[1]
-        // Create a repository config to reset the name back to the previous name
-        const rename = {repository: { name: to, oldname: from}}
-        const repo = {repo: from, owner: payload.repository.owner.login}
-        return renameSync(true, context, repo, rename)
-      }))
-    }
-
-    const otherFiles = changes.data.files.filter(f => f.status !== 'renamed')
-    const files = otherFiles.map(f => { return f.filename })
+    const files = changes.data.files.map(f => { return f.filename })
 
     const settingsModified = files.includes(Settings.FILE_NAME)
 
