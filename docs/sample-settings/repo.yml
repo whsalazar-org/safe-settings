@@ -196,7 +196,13 @@ branches:
         apps: []
         users: []
         teams: []
-        
+
+# Custom properties
+# See https://docs.github.com/en/rest/repos/custom-properties?apiVersion=2022-11-28
+custom_properties:
+  - name: test
+    value: test
+
 validator:
   pattern: '[a-zA-Z0-9_-]+_[a-zA-Z0-9_-]+.*' 
 

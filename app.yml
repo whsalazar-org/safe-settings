@@ -30,6 +30,7 @@ default_events:
 # the value (for example, write).
 # Valid values are `read`, `write`, and `none`
 default_permissions:
+    repository_custom_properties: write
     organization_custom_properties: admin
 
     # Repository creation, deletion, settings, teams, and collaborators.

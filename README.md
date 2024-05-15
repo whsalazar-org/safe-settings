@@ -498,6 +498,12 @@ branches:
         users: []
         teams: []
 
+# Custom properties
+# See https://docs.github.com/en/rest/repos/custom-properties?apiVersion=2022-11-28
+custom_properties:
+  - name: test
+    value: test
+
 # See the docs (https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/configuring-autolinks-to-reference-external-resources) for a description of autolinks and replacement values.
 autolinks:
   - key_prefix: 'JIRA-'
