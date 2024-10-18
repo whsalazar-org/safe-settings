@@ -36,7 +36,7 @@ jobs:
         with:
           appSourcePath: ${{ github.workspace }}
           _dockerfilePathKey_: _dockerfilePath_
-          registryUrl: 
+          registryUrl: safesettingsreg.azurecr.io
           registryUsername: ${{ secrets.SAFESETTINGS_REGISTRY_USERNAME }}
           registryPassword: ${{ secrets.SAFESETTINGS_REGISTRY_PASSWORD }}
           containerAppName: safe-settings
