@@ -40,6 +40,6 @@ jobs:
           registryPassword: ${{ secrets.SAFESETTINGS_REGISTRY_PASSWORD }}
           containerAppName: safe-settings
           resourceGroup: safesettings-demo-rg
-          imageToBuild: default/safe-settings:${{ github.sha }}
+          imageToBuild: safesettingsreg.azurecr.io/safe-settings:${{ github.sha }}
 
 
